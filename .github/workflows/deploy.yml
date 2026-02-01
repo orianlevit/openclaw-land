@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:  # Allow manual triggers
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -29,7 +29,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy
+          secrets: |
+            OPENAI_API_KEY
         env:
-          # Pass secrets to wrangler for the deployment
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
