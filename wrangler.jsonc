@@ -48,13 +48,13 @@
     }
   ],
 
-  // R2 bucket for bot data persistence
-  "r2_buckets": [
-    {
-      "binding": "BOT_BUCKET",
-      "bucket_name": "openclaw-bots-data"
-    }
-  ],
+  // R2 bucket for bot data persistence (optional - enable R2 in Cloudflare dashboard first)
+  // "r2_buckets": [
+  //   {
+  //     "binding": "BOT_BUCKET",
+  //     "bucket_name": "openclaw-bots-data"
+  //   }
+  // ],
 
   "migrations": [
     {

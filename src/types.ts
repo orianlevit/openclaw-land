@@ -20,8 +20,8 @@ export interface Env {
   // D1 database for bot registry
   DB: D1Database;
   
-  // R2 bucket for bot data persistence
-  BOT_BUCKET: R2Bucket;
+  // R2 bucket for bot data persistence (optional)
+  BOT_BUCKET?: R2Bucket;
   
   // Static assets
   ASSETS: Fetcher;
