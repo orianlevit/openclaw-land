@@ -25,7 +25,7 @@ const config = {
         defaults: {
             workspace: '/root/clawd',
             model: {
-                primary: 'anthropic/claude-opus-4-5'
+                primary: 'openai/gpt-4o'
             }
         }
     },
@@ -45,9 +45,9 @@ if (process.env.OPENCLAW_GATEWAY_TOKEN) {
     config.gateway.auth = { token: process.env.OPENCLAW_GATEWAY_TOKEN };
 }
 
-// Configure Anthropic API key if provided
-if (process.env.ANTHROPIC_API_KEY) {
-    console.log('Configuring Anthropic API key');
+// Configure OpenAI API key if provided
+if (process.env.OPENAI_API_KEY) {
+    console.log('Configuring OpenAI API key');
 }
 
 fs.writeFileSync(configPath, JSON.stringify(config, null, 2));

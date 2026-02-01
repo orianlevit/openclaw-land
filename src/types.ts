@@ -27,7 +27,7 @@ export interface Env {
   ASSETS: Fetcher;
   
   // API key for all bots (platform-provided)
-  ANTHROPIC_API_KEY?: string;
+  OPENAI_API_KEY?: string;
   
   // Development mode (skips auth)
   DEV_MODE?: string;

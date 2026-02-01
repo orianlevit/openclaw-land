@@ -1,7 +1,7 @@
 # Copy this file to .dev.vars and fill in your values
 
-# Anthropic API key for all bots
-ANTHROPIC_API_KEY=sk-ant-...
+# OpenAI API key for all bots
+OPENAI_API_KEY=sk-proj-...
 
 # Development mode - skips container startup for local testing
 DEV_MODE=true

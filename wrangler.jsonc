@@ -70,5 +70,5 @@
   }
 
   // Secrets to configure via GitHub Secrets or `wrangler secret put`:
-  // - ANTHROPIC_API_KEY: Your Anthropic API key for all bots
+  // - OPENAI_API_KEY: Your OpenAI API key for all bots
 }

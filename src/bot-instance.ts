@@ -63,9 +63,9 @@ export class BotInstance extends DurableObject<Env> {
       OPENCLAW_GATEWAY_TOKEN: this.getGatewayToken(),
     };
 
-    // Pass through Anthropic API key if set
-    if (this.env.ANTHROPIC_API_KEY) {
-      envVars.ANTHROPIC_API_KEY = this.env.ANTHROPIC_API_KEY;
+    // Pass through OpenAI API key if set
+    if (this.env.OPENAI_API_KEY) {
+      envVars.OPENAI_API_KEY = this.env.OPENAI_API_KEY;
     }
 
     return envVars;
