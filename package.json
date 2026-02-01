@@ -1,0 +1,21 @@
+{
+  "name": "openclaw-land",
+  "version": "1.0.0",
+  "description": "Multi-tenant SaaS for OpenClaw bots on Cloudflare Workers",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:init": "wrangler d1 execute openclaw-db --local --file=./schema.sql",
+    "db:init:remote": "wrangler d1 execute openclaw-db --remote --file=./schema.sql"
+  },
+  "dependencies": {
+    "hono": "^4.6.0",
+    "nanoid": "^5.0.9"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241127.0",
+    "typescript": "^5.7.2",
+    "wrangler": "^4.61.1"
+  }
+}
