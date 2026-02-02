@@ -9,7 +9,7 @@ const STARTUP_TIMEOUT_MS = 180_000;
 
 // Container interface for Cloudflare Sandbox
 interface Container {
-  start(options: { entrypoint: string; args: string[] }): Promise<void>;
+  start(options: { entrypoint: string[] }): Promise<void>;
   getTcpPort(port: number): Promise<unknown>;
   fetch(request: Request, port: number): Promise<Response>;
 }
@@ -103,8 +103,7 @@ export class BotInstance extends DurableObject<Env> {
         .join(' ');
 
       await container.start({
-        entrypoint: '/bin/bash',
-        args: ['-c', `${envArgs} /usr/local/bin/start-openclaw.sh`],
+        entrypoint: ['/bin/bash', '-c', `${envArgs} /usr/local/bin/start-openclaw.sh`],
       });
 
       // Wait for gateway to be ready
