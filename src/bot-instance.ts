@@ -8,6 +8,7 @@ export class BotInstance extends Container<Env> {
   defaultPort = 18789;
   sleepAfter = '10m';
   enableInternet = true;
+  entrypoint = ['/usr/local/bin/start-openclaw.sh'];
   
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
