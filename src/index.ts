@@ -173,7 +173,8 @@ app.get('/api/debug/container/:id', async (c) => {
   
   try {
     console.log('[Debug] Running exec command...');
-    const result = await sandbox.exec('echo "Hello from container" && node --version && pwd');
+    // Test if clawdbot is installed and show current processes
+    const result = await sandbox.exec('clawdbot --version && ls -la /usr/local/bin/start-openclaw.sh && cat /usr/local/bin/start-openclaw.sh | head -20');
     console.log('[Debug] Exec result:', JSON.stringify(result));
     
     return c.json({
