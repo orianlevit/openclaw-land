@@ -1,30 +1,37 @@
 #!/bin/bash
-# Minimal test - simple HTTP server to verify container networking works
-echo "=== Container Test Starting ==="
-echo "Date: $(date)"
+# Startup script for OpenClaw gateway
+set -e
+
+echo "=== OpenClaw Container Starting ==="
 echo "Node version: $(node --version)"
+echo "Checking clawdbot..."
+clawdbot --version || echo "clawdbot version failed"
 
-# Start a simple HTTP server on port 18789
-echo "Starting simple HTTP server on port 18789..."
-exec node -e "
-const http = require('http');
-const server = http.createServer((req, res) => {
-  console.log('Request:', req.method, req.url);
-  res.writeHead(200, {'Content-Type': 'application/json'});
-  res.end(JSON.stringify({
-    status: 'ok',
-    message: 'Container is working!',
-    timestamp: new Date().toISOString(),
-    node: process.version
-  }));
-});
+# Create minimal config
+CONFIG_DIR="/root/.clawdbot"
+mkdir -p "$CONFIG_DIR"
 
-server.listen(18789, '0.0.0.0', () => {
-  console.log('Test server running on http://0.0.0.0:18789');
-});
+cat > "$CONFIG_DIR/clawdbot.json" << 'EOF'
+{
+  "agents": {
+    "defaults": {
+      "workspace": "/root/clawd"
+    }
+  },
+  "gateway": {
+    "port": 18789,
+    "mode": "local",
+    "trustedProxies": ["10.1.0.0"]
+  }
+}
+EOF
 
-server.on('error', (err) => {
-  console.error('Server error:', err);
-  process.exit(1);
-});
-"
+echo "Config created"
+cat "$CONFIG_DIR/clawdbot.json"
+
+# Clean up any stale files
+rm -f /tmp/clawdbot-gateway.lock 2>/dev/null || true
+rm -f "$CONFIG_DIR/gateway.lock" 2>/dev/null || true
+
+echo "Starting gateway..."
+exec clawdbot gateway --port 18789 --verbose --allow-unconfigured --bind lan
