@@ -173,8 +173,11 @@ app.get('/api/debug/container/:id', async (c) => {
   
   try {
     console.log('[Debug] Running exec command...');
-    // Test if clawdbot is installed and show current processes
-    const result = await sandbox.exec('clawdbot --version && ls -la /usr/local/bin/start-openclaw.sh && cat /usr/local/bin/start-openclaw.sh | head -20');
+    // List processes and check gateway status
+    const procs = await sandbox.listProcesses();
+    console.log('[Debug] Processes:', JSON.stringify(procs));
+    
+    const result = await sandbox.exec('ps aux && echo "---" && netstat -tlnp 2>/dev/null || ss -tlnp');
     console.log('[Debug] Exec result:', JSON.stringify(result));
     
     return c.json({
