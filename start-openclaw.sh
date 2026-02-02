@@ -1,37 +1,30 @@
 #!/bin/bash
-# Startup script for OpenClaw gateway
+# Test startup script - simple HTTP server to verify container works
 set -e
 
 echo "=== OpenClaw Container Starting ==="
 echo "Node version: $(node --version)"
-echo "Checking clawdbot..."
-clawdbot --version || echo "clawdbot version failed"
+echo "npm version: $(npm --version)"
 
-# Create minimal config
-CONFIG_DIR="/root/.clawdbot"
-mkdir -p "$CONFIG_DIR"
+# Try clawdbot and log output
+echo "Testing clawdbot..."
+clawdbot --version 2>&1 || echo "clawdbot --version failed"
+clawdbot --help 2>&1 | head -10 || echo "clawdbot --help failed"
 
-cat > "$CONFIG_DIR/clawdbot.json" << 'EOF'
-{
-  "agents": {
-    "defaults": {
-      "workspace": "/root/clawd"
-    }
-  },
-  "gateway": {
-    "port": 18789,
-    "mode": "local",
-    "trustedProxies": ["10.1.0.0"]
-  }
-}
-EOF
+# Test if clawdbot gateway starts at all
+echo "Attempting to start gateway..."
 
-echo "Config created"
-cat "$CONFIG_DIR/clawdbot.json"
+# Start clawdbot gateway and capture output
+clawdbot gateway --port 18789 --verbose --allow-unconfigured --bind lan 2>&1 &
+GATEWAY_PID=$!
 
-# Clean up any stale files
-rm -f /tmp/clawdbot-gateway.lock 2>/dev/null || true
-rm -f "$CONFIG_DIR/gateway.lock" 2>/dev/null || true
-
-echo "Starting gateway..."
-exec clawdbot gateway --port 18789 --verbose --allow-unconfigured --bind lan
+# Wait a bit and check if it's still running
+sleep 5
+if kill -0 $GATEWAY_PID 2>/dev/null; then
+    echo "Gateway process still running (PID: $GATEWAY_PID)"
+    # Keep waiting
+    wait $GATEWAY_PID
+else
+    echo "Gateway process exited"
+    exit 1
+fi
