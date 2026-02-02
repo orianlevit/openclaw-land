@@ -59,7 +59,7 @@
   "migrations": [
     {
       "new_sqlite_classes": ["Sandbox"],
-      "tag": "v1"
+      "tag": "v2"
     }
   ],
 
