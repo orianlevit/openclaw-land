@@ -19,6 +19,13 @@ const STARTUP_TIMEOUT_MS = 120_000; // 2 minutes for gateway startup
 
 const app = new Hono<AppEnv>();
 
+// Log all requests
+app.use('*', async (c, next) => {
+  console.log('[Worker] Request:', c.req.method, c.req.url);
+  await next();
+  console.log('[Worker] Response status:', c.res.status);
+});
+
 // Enable CORS for API routes
 app.use('/api/*', cors());
 
