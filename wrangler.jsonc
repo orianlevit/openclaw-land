@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "openclaw-land",
+  "name": "openclaw-land-v2",
   "main": "src/test-worker.ts",
   "compatibility_date": "2025-01-15",
   "compatibility_flags": ["nodejs_compat"],
