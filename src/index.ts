@@ -428,34 +428,42 @@ app.all('/bot/:id/*', async (c) => {
   
   // Handle HTTP requests
   console.log('[HTTP] Proxying:', url.pathname + url.search);
-  const httpResponse = await sandbox.containerFetch(proxyRequest, OPENCLAW_PORT);
   
-  // Check if this is HTML and inject the correct base path for the Control UI
-  const contentType = httpResponse.headers.get('Content-Type') || '';
-  console.log('[HTTP] Response Content-Type:', contentType);
-  
-  if (contentType.includes('text/html')) {
-    let html = await httpResponse.text();
-    console.log('[HTTP] Got HTML, length:', html.length);
+  try {
+    const httpResponse = await sandbox.containerFetch(proxyRequest, OPENCLAW_PORT);
+    console.log('[HTTP] containerFetch completed, status:', httpResponse.status);
     
-    // Replace empty base path with our bot-specific path
-    const basePath = `/bot/${botId}`;
-    const originalHtml = html;
-    html = html.replace(
-      'window.__CLAWDBOT_CONTROL_UI_BASE_PATH__="";',
-      `window.__CLAWDBOT_CONTROL_UI_BASE_PATH__="${basePath}";`
-    );
+    // Check if this is HTML and inject the correct base path for the Control UI
+    const contentType = httpResponse.headers.get('Content-Type') || '';
+    console.log('[HTTP] Response Content-Type:', contentType);
     
-    const wasModified = html !== originalHtml;
-    console.log('[HTTP] Base path injection:', wasModified ? 'SUCCESS' : 'NOT FOUND', 'basePath:', basePath);
+    if (contentType.includes('text/html')) {
+      const html = await httpResponse.text();
+      console.log('[HTTP] Got HTML, length:', html.length);
+      
+      // Replace empty base path with our bot-specific path
+      const basePath = `/bot/${botId}`;
+      const modifiedHtml = html.replace(
+        'window.__CLAWDBOT_CONTROL_UI_BASE_PATH__="";',
+        `window.__CLAWDBOT_CONTROL_UI_BASE_PATH__="${basePath}";`
+      );
+      
+      const wasModified = modifiedHtml !== html;
+      console.log('[HTTP] Base path injection:', wasModified ? 'SUCCESS' : 'NOT FOUND', 'basePath:', basePath);
+      
+      // Create new response with modified HTML
+      const newHeaders = new Headers(httpResponse.headers);
+      return new Response(modifiedHtml, {
+        status: httpResponse.status,
+        headers: newHeaders,
+      });
+    }
     
-    return new Response(html, {
-      status: httpResponse.status,
-      headers: httpResponse.headers,
-    });
+    return httpResponse;
+  } catch (fetchError) {
+    console.error('[HTTP] Error processing request:', fetchError);
+    throw fetchError;
   }
-  
-  return httpResponse;
 });
 
 // =============================================================================
