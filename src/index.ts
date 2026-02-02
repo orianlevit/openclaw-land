@@ -136,6 +136,11 @@ async function ensureOpenClawGateway(sandbox: Sandbox<Env>, env: Env, botId: str
 // Debug endpoint to test container
 // =============================================================================
 
+// Simple ping to verify Worker is running
+app.get('/api/ping', async (c) => {
+  return c.json({ pong: true, time: Date.now() });
+});
+
 app.get('/api/debug/container/:id', async (c) => {
   const botId = c.req.param('id');
   
