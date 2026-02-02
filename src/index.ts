@@ -173,11 +173,40 @@ app.get('/api/debug/container/:id', async (c) => {
   
   try {
     console.log('[Debug] Running exec command...');
-    // List processes and check port
+    // List processes via Sandbox SDK
     const procs = await sandbox.listProcesses();
-    console.log('[Debug] Processes:', JSON.stringify(procs));
+    console.log('[Debug] Sandbox processes:', JSON.stringify(procs));
     
-    const result = await sandbox.exec('curl -v http://localhost:18789/ 2>&1 | head -30');
+    // Try to start gateway if not running
+    const existingGateway = procs.find(p => 
+      p.command.includes('start-openclaw.sh') || 
+      p.command.includes('clawdbot gateway')
+    );
+    
+    if (!existingGateway) {
+      console.log('[Debug] No gateway running, starting one...');
+      const envVars = buildEnvVars(c.env, botId);
+      const process = await sandbox.startProcess('/usr/local/bin/start-openclaw.sh', {
+        env: envVars,
+      });
+      console.log('[Debug] Started process:', process.id, process.status);
+      
+      // Wait a bit for startup
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      
+      // Get logs
+      const logs = await process.getLogs();
+      return c.json({
+        success: true,
+        message: 'Started gateway',
+        processId: process.id,
+        status: process.status,
+        stdout: logs.stdout,
+        stderr: logs.stderr,
+      });
+    }
+    
+    const result = await sandbox.exec('pgrep -la clawdbot || echo "no clawdbot process"');
     console.log('[Debug] Exec result:', JSON.stringify(result));
     
     return c.json({
