@@ -64,15 +64,24 @@ async function findExistingGatewayProcess(sandbox: Sandbox<Env>): Promise<Proces
 
 /**
  * Build environment variables for the gateway
+ * Following moltworker's pattern: pass API keys and gateway token to container
  */
 function buildEnvVars(env: Env, botId: string): Record<string, string> {
-  const envVars: Record<string, string> = {
-    OPENCLAW_GATEWAY_TOKEN: `bot-${botId.slice(0, 16)}`,
-  };
+  const envVars: Record<string, string> = {};
   
+  // Pass API keys
+  if (env.ANTHROPIC_API_KEY) {
+    envVars.ANTHROPIC_API_KEY = env.ANTHROPIC_API_KEY;
+  }
   if (env.OPENAI_API_KEY) {
     envVars.OPENAI_API_KEY = env.OPENAI_API_KEY;
   }
+  
+  // Generate a gateway token for this bot
+  envVars.OPENCLAW_GATEWAY_TOKEN = `bot-${botId.slice(0, 16)}`;
+  
+  // Enable dev mode for easier testing
+  envVars.OPENCLAW_DEV_MODE = 'true';
   
   return envVars;
 }

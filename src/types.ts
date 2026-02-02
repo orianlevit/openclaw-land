@@ -28,7 +28,8 @@ export interface Env {
   // Static assets
   ASSETS: Fetcher;
   
-  // API key for all bots (platform-provided)
+  // API keys for all bots (platform-provided)
+  ANTHROPIC_API_KEY?: string;
   OPENAI_API_KEY?: string;
   
   // Development mode (skips auth)
