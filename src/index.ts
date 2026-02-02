@@ -118,8 +118,29 @@ app.delete('/api/bots/:id', async (c) => {
 });
 
 // =============================================================================
-// Bot Proxy Routes - Forward to Bot Instance Durable Object
+// Bot Routes
 // =============================================================================
+
+/**
+ * Bot chat page - serve the chat UI (MUST come before wildcard)
+ */
+app.get('/bot/:id', async (c) => {
+  const botId = c.req.param('id');
+  
+  // Verify bot exists
+  const bot = await getBot(c.env.DB, botId);
+  if (!bot) {
+    return c.redirect('/');
+  }
+  
+  // Serve the chat HTML from assets
+  const url = new URL(c.req.url);
+  url.pathname = '/chat.html';
+  url.searchParams.set('botId', botId);
+  url.searchParams.set('botName', bot.name);
+  
+  return c.env.ASSETS.fetch(new Request(url.toString(), c.req.raw));
+});
 
 /**
  * Proxy all /bot/:id/* requests to the bot's Durable Object
@@ -150,28 +171,6 @@ app.all('/bot/:id/*', async (c) => {
   });
   
   return stub.fetch(request);
-});
-
-/**
- * Bot chat page - serve the chat UI
- */
-app.get('/bot/:id', async (c) => {
-  const botId = c.req.param('id');
-  
-  // Verify bot exists
-  const bot = await getBot(c.env.DB, botId);
-  if (!bot) {
-    return c.redirect('/');
-  }
-  
-  // Serve the chat HTML
-  // The chat.html will be served from assets
-  const url = new URL(c.req.url);
-  url.pathname = '/chat.html';
-  url.searchParams.set('botId', botId);
-  url.searchParams.set('botName', bot.name);
-  
-  return c.env.ASSETS.fetch(new Request(url.toString(), c.req.raw));
 });
 
 // =============================================================================
