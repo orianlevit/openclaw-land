@@ -9,6 +9,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { getSandbox, type Sandbox, type Process } from '@cloudflare/sandbox';
 import type { AppEnv, Env } from './types';
+import type { ExecutionContext } from '@cloudflare/workers-types';
 import { listBots, getBot, createBot, deleteBot } from './bot-registry';
 
 // Re-export the Sandbox class for Cloudflare
@@ -385,7 +386,7 @@ app.get('*', async (c) => {
   return c.env.ASSETS.fetch(c.req.raw);
 });
 
-// Export Workers handler
+// Export Workers handler - use arrow function to preserve context
 export default {
-  fetch: app.fetch,
+  fetch: (request: Request, env: Env, ctx: ExecutionContext) => app.fetch(request, env, ctx),
 };
