@@ -7,19 +7,6 @@ const OPENCLAW_PORT = 18789;
 /** Maximum time to wait for gateway to start (3 minutes) */
 const STARTUP_TIMEOUT_MS = 180_000;
 
-// Container interface for Cloudflare Sandbox
-interface Container {
-  start(options: { entrypoint: string[] }): Promise<void>;
-  getTcpPort(port: number): Promise<unknown>;
-  fetch(request: Request, port: number): Promise<Response>;
-}
-
-// Extended state type with container
-interface DurableObjectStateWithContainer {
-  id: DurableObjectId;
-  container?: Container;
-}
-
 /**
  * Bot Instance Durable Object
  * 
@@ -38,10 +25,10 @@ export class BotInstance extends DurableObject<Env> {
   }
 
   /**
-   * Get the container from the Durable Object state
+   * Get the container from ctx
    */
-  private getContainer(): Container | undefined {
-    return (this.ctx as unknown as DurableObjectStateWithContainer).container;
+  private get container() {
+    return (this.ctx as any).container;
   }
 
   /**
@@ -49,7 +36,6 @@ export class BotInstance extends DurableObject<Env> {
    */
   private getGatewayToken(): string {
     if (!this.gatewayToken) {
-      // Use the DO ID as part of the token for uniqueness
       this.gatewayToken = `bot-${this.ctx.id.toString().slice(0, 16)}`;
     }
     return this.gatewayToken;
@@ -63,7 +49,6 @@ export class BotInstance extends DurableObject<Env> {
       OPENCLAW_GATEWAY_TOKEN: this.getGatewayToken(),
     };
 
-    // Pass through OpenAI API key if set
     if (this.env.OPENAI_API_KEY) {
       envVars.OPENAI_API_KEY = this.env.OPENAI_API_KEY;
     }
@@ -80,7 +65,6 @@ export class BotInstance extends DurableObject<Env> {
     }
 
     if (this.startingUp) {
-      // Wait for existing startup to complete
       await this.waitForGateway();
       return;
     }
@@ -88,57 +72,44 @@ export class BotInstance extends DurableObject<Env> {
     this.startingUp = true;
 
     try {
-      console.log('[BotInstance] Checking OpenClaw container...');
+      console.log('[BotInstance] Checking container status...');
 
-      // Get the container from state
-      const container = this.getContainer();
-      if (!container) {
-        throw new Error('Container not available - ensure containers are configured in wrangler.jsonc');
+      if (!this.container) {
+        throw new Error('Container not available');
       }
 
-      // Check if container is already running by trying to connect
-      try {
-        const healthCheck = await container.fetch(
-          new Request(`http://localhost:${OPENCLAW_PORT}/api/health`),
-          OPENCLAW_PORT
-        );
-        if (healthCheck && healthCheck.ok) {
-          console.log('[BotInstance] Container already running');
-          this.gatewayReady = true;
-          return;
+      // Check if already running
+      if (this.container.running) {
+        console.log('[BotInstance] Container already running, checking gateway...');
+        try {
+          const port = this.container.getTcpPort(OPENCLAW_PORT);
+          const res = await port.fetch(`http://container:${OPENCLAW_PORT}/`);
+          if (res.ok) {
+            console.log('[BotInstance] Gateway already responding');
+            this.gatewayReady = true;
+            return;
+          }
+        } catch (e) {
+          console.log('[BotInstance] Gateway not responding yet');
         }
-      } catch (e) {
-        // Container not running, will start it
-        console.log('[BotInstance] Container not running, starting...');
-      }
-
-      // Start the gateway with environment variables
-      const env = this.buildContainerEnv();
-      const envArgs = Object.entries(env)
-        .map(([k, v]) => `${k}=${v}`)
-        .join(' ');
-
-      try {
-        await container.start({
-          entrypoint: ['/bin/bash', '-c', `${envArgs} /usr/local/bin/start-openclaw.sh`],
+      } else {
+        // Start container
+        console.log('[BotInstance] Starting container...');
+        const env = this.buildContainerEnv();
+        
+        this.container.start({
+          env,
+          entrypoint: ['/usr/local/bin/start-openclaw.sh'],
+          enableInternet: true,
         });
-      } catch (startError: unknown) {
-        // If container is already running, that's fine
-        const errorMessage = startError instanceof Error ? startError.message : String(startError);
-        if (errorMessage.includes('already running')) {
-          console.log('[BotInstance] Container was already running');
-        } else {
-          throw startError;
-        }
       }
 
-      // Wait for gateway to be ready
+      // Wait for gateway
       await this.waitForGateway();
-
       this.gatewayReady = true;
-      console.log('[BotInstance] OpenClaw gateway is ready');
+      console.log('[BotInstance] Gateway is ready');
     } catch (error) {
-      console.error('[BotInstance] Failed to start container:', error);
+      console.error('[BotInstance] Failed:', error);
       throw error;
     } finally {
       this.startingUp = false;
@@ -146,34 +117,22 @@ export class BotInstance extends DurableObject<Env> {
   }
 
   /**
-   * Wait for the gateway to be ready by polling the health endpoint
+   * Wait for the gateway to be ready
    */
   private async waitForGateway(): Promise<void> {
     const startTime = Date.now();
-    const pollInterval = 2000; // 2 seconds
+    const pollInterval = 3000;
 
     while (Date.now() - startTime < STARTUP_TIMEOUT_MS) {
       try {
-        const container = this.getContainer();
-        if (!container) {
-          throw new Error('Container not available');
+        const port = this.container.getTcpPort(OPENCLAW_PORT);
+        const res = await port.fetch(`http://container:${OPENCLAW_PORT}/`);
+        if (res.ok || res.status === 401 || res.status === 403) {
+          // Gateway is responding (even auth errors mean it's up)
+          return;
         }
-
-        const response = await container.getTcpPort(OPENCLAW_PORT);
-        if (response) {
-          // Try to connect to verify it's actually ready
-          const healthCheck = await container.fetch(
-            new Request(`http://localhost:${OPENCLAW_PORT}/api/health`),
-            OPENCLAW_PORT
-          );
-          
-          if (healthCheck && healthCheck.ok) {
-            return;
-          }
-        }
-      } catch (error) {
-        // Gateway not ready yet, continue waiting
-        console.log('[BotInstance] Waiting for gateway...', error);
+      } catch (e) {
+        console.log('[BotInstance] Waiting for gateway...', (e as Error).message);
       }
 
       await new Promise((resolve) => setTimeout(resolve, pollInterval));
@@ -189,11 +148,12 @@ export class BotInstance extends DurableObject<Env> {
     const url = new URL(request.url);
     console.log('[BotInstance] Request:', url.pathname);
 
-    // Health check endpoint
+    // Health check
     if (url.pathname === '/health') {
       return new Response(JSON.stringify({ 
         status: 'ok', 
-        gatewayReady: this.gatewayReady 
+        gatewayReady: this.gatewayReady,
+        containerRunning: this.container?.running ?? false,
       }), {
         headers: { 'Content-Type': 'application/json' },
       });
@@ -213,42 +173,22 @@ export class BotInstance extends DurableObject<Env> {
       });
     }
 
-    const container = this.getContainer();
-    if (!container) {
-      return new Response('Container not available', { status: 503 });
-    }
+    // Get port for proxying
+    const port = this.container.getTcpPort(OPENCLAW_PORT);
 
-    // Handle WebSocket upgrade
-    const upgradeHeader = request.headers.get('Upgrade');
-    if (upgradeHeader?.toLowerCase() === 'websocket') {
-      console.log('[BotInstance] Proxying WebSocket connection');
-      
-      // Add gateway token to the request
-      const wsUrl = new URL(request.url);
-      wsUrl.searchParams.set('token', this.getGatewayToken());
-      
-      const wsRequest = new Request(wsUrl.toString(), {
-        headers: request.headers,
-      });
-      
-      return container.fetch(wsRequest, OPENCLAW_PORT);
-    }
-
-    // Proxy HTTP request to container
-    console.log('[BotInstance] Proxying HTTP request');
-    
-    // Add gateway token for authenticated requests
+    // Add gateway token
     const proxyUrl = new URL(request.url);
+    proxyUrl.hostname = 'container';
+    proxyUrl.port = String(OPENCLAW_PORT);
     if (!proxyUrl.searchParams.has('token')) {
       proxyUrl.searchParams.set('token', this.getGatewayToken());
     }
 
-    const proxyRequest = new Request(proxyUrl.toString(), {
+    // Proxy the request
+    return port.fetch(proxyUrl.toString(), {
       method: request.method,
       headers: request.headers,
       body: request.body,
     });
-
-    return container.fetch(proxyRequest, OPENCLAW_PORT);
   }
 }
