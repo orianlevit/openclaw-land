@@ -133,6 +133,38 @@ async function ensureOpenClawGateway(sandbox: Sandbox<Env>, env: Env, botId: str
 }
 
 // =============================================================================
+// Debug endpoint to test container
+// =============================================================================
+
+app.get('/api/debug/container/:id', async (c) => {
+  const botId = c.req.param('id');
+  
+  console.log('[Debug] Testing container for bot:', botId);
+  
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sandbox = getSandbox(c.env.BOT_INSTANCE as any, botId);
+  
+  try {
+    console.log('[Debug] Running exec command...');
+    const result = await sandbox.exec('echo "Hello from container" && node --version && pwd');
+    console.log('[Debug] Exec result:', JSON.stringify(result));
+    
+    return c.json({
+      success: true,
+      stdout: result.stdout,
+      stderr: result.stderr,
+      exitCode: result.exitCode,
+    });
+  } catch (error) {
+    console.error('[Debug] Exec failed:', error);
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    }, 500);
+  }
+});
+
+// =============================================================================
 // API Routes
 // =============================================================================
 
