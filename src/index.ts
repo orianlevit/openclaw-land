@@ -366,7 +366,9 @@ app.all('/bot/:id/*', async (c) => {
   const sandbox = getSandbox(c.env.BOT_INSTANCE as any, botId);
   
   // Check if this is a WebSocket request
-  const isWebSocketRequest = request.headers.get('Upgrade')?.toLowerCase() === 'websocket';
+  const upgradeHeader = request.headers.get('Upgrade');
+  const isWebSocketRequest = upgradeHeader?.toLowerCase() === 'websocket';
+  console.log('[BOT PROXY] Upgrade header:', upgradeHeader, 'isWebSocket:', isWebSocketRequest);
   
   // Check if gateway is already running
   const existingProcess = await findExistingGatewayProcess(sandbox);
