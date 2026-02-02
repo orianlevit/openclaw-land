@@ -347,6 +347,10 @@ app.get('/bot/:id', async (c) => {
  * Proxy all /bot/:id/* requests to the bot's container
  */
 app.all('/bot/:id/*', async (c) => {
+  console.log('[BOT PROXY] Route matched!');
+  console.log('[BOT PROXY] Full URL:', c.req.url);
+  console.log('[BOT PROXY] Method:', c.req.method);
+  
   const botId = c.req.param('id');
   const request = c.req.raw;
   const url = new URL(request.url);
