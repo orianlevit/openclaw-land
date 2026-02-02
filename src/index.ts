@@ -438,8 +438,8 @@ app.all('/bot/:id/*', async (c) => {
     // Replace empty base path with our bot-specific path
     const basePath = `/bot/${botId}`;
     html = html.replace(
-      'window.__CLAWDBOT_CONTROL_UI_BASE_PATH__=""',
-      `window.__CLAWDBOT_CONTROL_UI_BASE_PATH__="${basePath}"`
+      'window.__CLAWDBOT_CONTROL_UI_BASE_PATH__="";',
+      `window.__CLAWDBOT_CONTROL_UI_BASE_PATH__="${basePath}";`
     );
     
     console.log('[HTTP] Injected base path:', basePath);
