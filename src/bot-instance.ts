@@ -176,8 +176,9 @@ export class BotInstance extends DurableObject<Env> {
     // Get port for proxying
     const port = this.container.getTcpPort(OPENCLAW_PORT);
 
-    // Add gateway token
+    // Build HTTP URL (not HTTPS - container doesn't support it)
     const proxyUrl = new URL(request.url);
+    proxyUrl.protocol = 'http:';
     proxyUrl.hostname = 'container';
     proxyUrl.port = String(OPENCLAW_PORT);
     if (!proxyUrl.searchParams.has('token')) {
