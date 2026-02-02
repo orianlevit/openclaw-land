@@ -1,30 +1,30 @@
 #!/bin/bash
-# Test startup script - simple HTTP server to verify container works
-set -e
-
-echo "=== OpenClaw Container Starting ==="
+# Minimal test - simple HTTP server to verify container networking works
+echo "=== Container Test Starting ==="
+echo "Date: $(date)"
 echo "Node version: $(node --version)"
-echo "npm version: $(npm --version)"
 
-# Try clawdbot and log output
-echo "Testing clawdbot..."
-clawdbot --version 2>&1 || echo "clawdbot --version failed"
-clawdbot --help 2>&1 | head -10 || echo "clawdbot --help failed"
+# Start a simple HTTP server on port 18789
+echo "Starting simple HTTP server on port 18789..."
+exec node -e "
+const http = require('http');
+const server = http.createServer((req, res) => {
+  console.log('Request:', req.method, req.url);
+  res.writeHead(200, {'Content-Type': 'application/json'});
+  res.end(JSON.stringify({
+    status: 'ok',
+    message: 'Container is working!',
+    timestamp: new Date().toISOString(),
+    node: process.version
+  }));
+});
 
-# Test if clawdbot gateway starts at all
-echo "Attempting to start gateway..."
+server.listen(18789, '0.0.0.0', () => {
+  console.log('Test server running on http://0.0.0.0:18789');
+});
 
-# Start clawdbot gateway and capture output
-clawdbot gateway --port 18789 --verbose --allow-unconfigured --bind lan 2>&1 &
-GATEWAY_PID=$!
-
-# Wait a bit and check if it's still running
-sleep 5
-if kill -0 $GATEWAY_PID 2>/dev/null; then
-    echo "Gateway process still running (PID: $GATEWAY_PID)"
-    # Keep waiting
-    wait $GATEWAY_PID
-else
-    echo "Gateway process exited"
-    exit 1
-fi
+server.on('error', (err) => {
+  console.error('Server error:', err);
+  process.exit(1);
+});
+"
