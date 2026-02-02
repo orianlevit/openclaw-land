@@ -2,21 +2,135 @@
  * OpenClaw Land - Multi-tenant SaaS for OpenClaw bots
  * 
  * This Worker manages multiple OpenClaw bot instances, each running
- * in its own Cloudflare Container via Durable Objects.
+ * in its own Cloudflare Container via the Sandbox SDK.
  */
 
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { getSandbox, type Sandbox, type Process } from '@cloudflare/sandbox';
 import type { AppEnv, Env } from './types';
 import { listBots, getBot, createBot, deleteBot } from './bot-registry';
 
-// Re-export the Durable Object class for Cloudflare
-export { BotInstance } from './bot-instance';
+// Re-export the Sandbox class for Cloudflare
+export { Sandbox } from '@cloudflare/sandbox';
+
+const OPENCLAW_PORT = 18789;
+const STARTUP_TIMEOUT_MS = 120_000; // 2 minutes for gateway startup
 
 const app = new Hono<AppEnv>();
 
 // Enable CORS for API routes
 app.use('/api/*', cors());
+
+// =============================================================================
+// Gateway Process Management (like moltworker's approach)
+// =============================================================================
+
+/**
+ * Find an existing OpenClaw gateway process
+ */
+async function findExistingGatewayProcess(sandbox: Sandbox<Env>): Promise<Process | null> {
+  try {
+    const processes = await sandbox.listProcesses();
+    for (const proc of processes) {
+      const isGatewayProcess = 
+        proc.command.includes('start-openclaw.sh') ||
+        proc.command.includes('clawdbot gateway');
+      
+      if (isGatewayProcess) {
+        if (proc.status === 'starting' || proc.status === 'running') {
+          return proc;
+        }
+      }
+    }
+  } catch (e) {
+    console.log('[Gateway] Could not list processes:', e);
+  }
+  return null;
+}
+
+/**
+ * Build environment variables for the gateway
+ */
+function buildEnvVars(env: Env, botId: string): Record<string, string> {
+  const envVars: Record<string, string> = {
+    OPENCLAW_GATEWAY_TOKEN: `bot-${botId.slice(0, 16)}`,
+  };
+  
+  if (env.OPENAI_API_KEY) {
+    envVars.OPENAI_API_KEY = env.OPENAI_API_KEY;
+  }
+  
+  return envVars;
+}
+
+/**
+ * Ensure the OpenClaw gateway is running
+ */
+async function ensureOpenClawGateway(sandbox: Sandbox<Env>, env: Env, botId: string): Promise<Process> {
+  // Check if gateway is already running
+  const existingProcess = await findExistingGatewayProcess(sandbox);
+  if (existingProcess) {
+    console.log('[Gateway] Found existing process:', existingProcess.id, 'status:', existingProcess.status);
+    
+    try {
+      console.log('[Gateway] Waiting for port', OPENCLAW_PORT, 'timeout:', STARTUP_TIMEOUT_MS);
+      await existingProcess.waitForPort(OPENCLAW_PORT, { mode: 'tcp', timeout: STARTUP_TIMEOUT_MS });
+      console.log('[Gateway] Gateway is reachable');
+      return existingProcess;
+    } catch (e) {
+      console.log('[Gateway] Existing process not reachable, killing and restarting...');
+      try {
+        await existingProcess.kill();
+      } catch (killError) {
+        console.log('[Gateway] Failed to kill process:', killError);
+      }
+    }
+  }
+  
+  // Start a new gateway
+  console.log('[Gateway] Starting new OpenClaw gateway...');
+  const envVars = buildEnvVars(env, botId);
+  const command = '/usr/local/bin/start-openclaw.sh';
+  
+  console.log('[Gateway] Starting with command:', command);
+  console.log('[Gateway] Environment vars:', Object.keys(envVars));
+  
+  let process: Process;
+  try {
+    process = await sandbox.startProcess(command, {
+      env: Object.keys(envVars).length > 0 ? envVars : undefined,
+    });
+    console.log('[Gateway] Process started with id:', process.id, 'status:', process.status);
+  } catch (startErr) {
+    console.error('[Gateway] Failed to start process:', startErr);
+    throw startErr;
+  }
+  
+  // Wait for the gateway to be ready
+  try {
+    console.log('[Gateway] Waiting for gateway on port', OPENCLAW_PORT);
+    await process.waitForPort(OPENCLAW_PORT, { mode: 'tcp', timeout: STARTUP_TIMEOUT_MS });
+    console.log('[Gateway] Gateway is ready!');
+    
+    const logs = await process.getLogs();
+    if (logs.stdout) console.log('[Gateway] stdout:', logs.stdout);
+    if (logs.stderr) console.log('[Gateway] stderr:', logs.stderr);
+  } catch (e) {
+    console.error('[Gateway] waitForPort failed:', e);
+    try {
+      const logs = await process.getLogs();
+      console.error('[Gateway] startup failed. Stderr:', logs.stderr);
+      console.error('[Gateway] startup failed. Stdout:', logs.stdout);
+      throw new Error(`OpenClaw gateway failed to start. Stderr: ${logs.stderr || '(empty)'}`);
+    } catch (logErr) {
+      console.error('[Gateway] Failed to get logs:', logErr);
+      throw e;
+    }
+  }
+  
+  return process;
+}
 
 // =============================================================================
 // API Routes
@@ -148,6 +262,8 @@ app.get('/bot/:id', async (c) => {
  */
 app.all('/bot/:id/*', async (c) => {
   const botId = c.req.param('id');
+  const request = c.req.raw;
+  const url = new URL(request.url);
   
   // Verify bot exists in registry
   const bot = await getBot(c.env.DB, botId);
@@ -155,22 +271,63 @@ app.all('/bot/:id/*', async (c) => {
     return c.json({ error: 'Bot not found' }, 404);
   }
   
-  // Import getContainer dynamically
-  const { getContainer } = await import('@cloudflare/containers');
+  // Get sandbox for this bot (using botId as the instance name)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sandbox = getSandbox(c.env.BOT_INSTANCE as any, botId);
   
-  // Get the container for this bot (using botId as the instance name)
-  const container = getContainer(c.env.BOT_INSTANCE, botId);
+  // Check if this is a WebSocket request
+  const isWebSocketRequest = request.headers.get('Upgrade')?.toLowerCase() === 'websocket';
+  
+  // Check if gateway is already running
+  const existingProcess = await findExistingGatewayProcess(sandbox);
+  const isGatewayReady = existingProcess !== null && existingProcess.status === 'running';
+  
+  // For non-WebSocket requests when gateway isn't ready, show loading and start in background
+  const acceptsHtml = request.headers.get('Accept')?.includes('text/html');
+  if (!isGatewayReady && !isWebSocketRequest && acceptsHtml) {
+    console.log('[Proxy] Gateway not ready, serving loading response');
+    
+    // Start the gateway in the background
+    c.executionCtx.waitUntil(
+      ensureOpenClawGateway(sandbox, c.env, botId).catch((err: Error) => {
+        console.error('[Proxy] Background gateway start failed:', err);
+      })
+    );
+    
+    return c.json({ 
+      status: 'starting', 
+      message: 'Bot container is starting...' 
+    }, 202);
+  }
+  
+  // Ensure gateway is running
+  try {
+    await ensureOpenClawGateway(sandbox, c.env, botId);
+  } catch (error) {
+    console.error('[Proxy] Failed to start gateway:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return c.json({
+      error: 'OpenClaw gateway failed to start',
+      details: errorMessage,
+    }, 503);
+  }
   
   // Rewrite the URL to remove /bot/:id prefix
-  const url = new URL(c.req.url);
   const pathAfterBotId = url.pathname.replace(`/bot/${botId}`, '') || '/';
   url.pathname = pathAfterBotId;
   
   // Create new request with modified URL
-  const proxyRequest = new Request(url.toString(), c.req.raw);
+  const proxyRequest = new Request(url.toString(), request);
   
-  // Forward to container (handles HTTP and WebSocket automatically)
-  return container.fetch(proxyRequest);
+  // Handle WebSocket connections
+  if (isWebSocketRequest) {
+    console.log('[WS] Proxying WebSocket connection');
+    return sandbox.wsConnect(proxyRequest, OPENCLAW_PORT);
+  }
+  
+  // Handle HTTP requests
+  console.log('[HTTP] Proxying:', url.pathname + url.search);
+  return sandbox.containerFetch(proxyRequest, OPENCLAW_PORT);
 });
 
 // =============================================================================

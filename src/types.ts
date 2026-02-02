@@ -1,4 +1,5 @@
-import type { DurableObjectNamespace, R2Bucket, D1Database, Fetcher } from '@cloudflare/workers-types';
+import type { R2Bucket, D1Database, Fetcher, DurableObjectNamespace } from '@cloudflare/workers-types';
+import type { Sandbox } from '@cloudflare/sandbox';
 
 /**
  * Bot data stored in D1
@@ -14,8 +15,9 @@ export interface Bot {
  * Environment bindings for the OpenClaw Land Worker
  */
 export interface Env {
-  // Durable Object for bot instances
-  BOT_INSTANCE: DurableObjectNamespace;
+  // Durable Object for bot instances (Sandbox type)
+  // Using any to avoid circular type instantiation
+  BOT_INSTANCE: DurableObjectNamespace<Sandbox<any>>;
   
   // D1 database for bot registry
   DB: D1Database;

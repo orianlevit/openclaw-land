@@ -20,7 +20,7 @@
   // Container configuration - one OpenClaw instance per bot
   "containers": [
     {
-      "class_name": "BotInstance",
+      "class_name": "Sandbox",
       "image": "./Dockerfile",
       "instance_type": "standard-4",
       "max_instances": 10
@@ -31,7 +31,7 @@
   "durable_objects": {
     "bindings": [
       {
-        "class_name": "BotInstance",
+        "class_name": "Sandbox",
         "name": "BOT_INSTANCE"
       }
     ]
@@ -58,7 +58,7 @@
 
   "migrations": [
     {
-      "new_sqlite_classes": ["BotInstance"],
+      "new_sqlite_classes": ["Sandbox"],
       "tag": "v1"
     }
   ],
