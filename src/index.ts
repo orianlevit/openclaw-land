@@ -432,17 +432,22 @@ app.all('/bot/:id/*', async (c) => {
   
   // Check if this is HTML and inject the correct base path for the Control UI
   const contentType = httpResponse.headers.get('Content-Type') || '';
+  console.log('[HTTP] Response Content-Type:', contentType);
+  
   if (contentType.includes('text/html')) {
     let html = await httpResponse.text();
+    console.log('[HTTP] Got HTML, length:', html.length);
     
     // Replace empty base path with our bot-specific path
     const basePath = `/bot/${botId}`;
+    const originalHtml = html;
     html = html.replace(
       'window.__CLAWDBOT_CONTROL_UI_BASE_PATH__="";',
       `window.__CLAWDBOT_CONTROL_UI_BASE_PATH__="${basePath}";`
     );
     
-    console.log('[HTTP] Injected base path:', basePath);
+    const wasModified = html !== originalHtml;
+    console.log('[HTTP] Base path injection:', wasModified ? 'SUCCESS' : 'NOT FOUND', 'basePath:', basePath);
     
     return new Response(html, {
       status: httpResponse.status,
