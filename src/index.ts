@@ -144,7 +144,7 @@ app.get('/bot/:id', async (c) => {
 });
 
 /**
- * Proxy all /bot/:id/* requests to the bot's Durable Object
+ * Proxy all /bot/:id/* requests to the bot's container
  */
 app.all('/bot/:id/*', async (c) => {
   const botId = c.req.param('id');
@@ -155,23 +155,22 @@ app.all('/bot/:id/*', async (c) => {
     return c.json({ error: 'Bot not found' }, 404);
   }
   
-  // Get the Durable Object for this bot
-  const doId = c.env.BOT_INSTANCE.idFromName(botId);
-  const stub = c.env.BOT_INSTANCE.get(doId);
+  // Import getContainer dynamically
+  const { getContainer } = await import('@cloudflare/containers');
+  
+  // Get the container for this bot (using botId as the instance name)
+  const container = getContainer(c.env.BOT_INSTANCE, botId);
   
   // Rewrite the URL to remove /bot/:id prefix
   const url = new URL(c.req.url);
   const pathAfterBotId = url.pathname.replace(`/bot/${botId}`, '') || '/';
   url.pathname = pathAfterBotId;
   
-  // Forward the request to the Durable Object
-  const request = new Request(url.toString(), {
-    method: c.req.method,
-    headers: c.req.raw.headers,
-    body: c.req.raw.body,
-  });
+  // Create new request with modified URL
+  const proxyRequest = new Request(url.toString(), c.req.raw);
   
-  return stub.fetch(request);
+  // Forward to container (handles HTTP and WebSocket automatically)
+  return container.fetch(proxyRequest);
 });
 
 // =============================================================================
