@@ -1,8 +1,8 @@
-// Minimal test worker
+// Minimal test worker - no assets, no hono
 export { Sandbox } from '@cloudflare/sandbox';
 
 export default {
-  async fetch(request: Request, env: any): Promise<Response> {
+  async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
     
     console.log('[TEST] Request:', request.method, url.pathname);
@@ -13,7 +13,13 @@ export default {
       });
     }
     
-    // Fall back to assets
-    return env.ASSETS.fetch(request);
+    // No assets - just return JSON
+    return new Response(JSON.stringify({ 
+      error: 'not found', 
+      path: url.pathname 
+    }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 };
