@@ -6,18 +6,20 @@ import type { Env } from './types';
  */
 export class BotInstance extends Container<Env> {
   defaultPort = 18789;
-  sleepAfter = '10m'; // Sleep after 10 minutes of inactivity
+  sleepAfter = '10m';
+  enableInternet = true;
   
-  // Set environment variables for the container
-  override getEnv(): Record<string, string> {
-    const env: Record<string, string> = {
-      OPENCLAW_GATEWAY_TOKEN: `bot-${this.ctx.id.toString().slice(0, 16)}`,
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    
+    // Set environment variables
+    this.envVars = {
+      OPENCLAW_GATEWAY_TOKEN: `bot-${ctx.id.toString().slice(0, 16)}`,
     };
     
-    if (this.env.OPENAI_API_KEY) {
-      env.OPENAI_API_KEY = this.env.OPENAI_API_KEY;
+    // Add OpenAI API key if available
+    if (env.OPENAI_API_KEY) {
+      this.envVars.OPENAI_API_KEY = env.OPENAI_API_KEY;
     }
-    
-    return env;
   }
 }
