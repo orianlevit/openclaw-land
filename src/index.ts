@@ -428,7 +428,29 @@ app.all('/bot/:id/*', async (c) => {
   
   // Handle HTTP requests
   console.log('[HTTP] Proxying:', url.pathname + url.search);
-  return sandbox.containerFetch(proxyRequest, OPENCLAW_PORT);
+  const httpResponse = await sandbox.containerFetch(proxyRequest, OPENCLAW_PORT);
+  
+  // Check if this is HTML and inject the correct base path for the Control UI
+  const contentType = httpResponse.headers.get('Content-Type') || '';
+  if (contentType.includes('text/html')) {
+    let html = await httpResponse.text();
+    
+    // Replace empty base path with our bot-specific path
+    const basePath = `/bot/${botId}`;
+    html = html.replace(
+      'window.__CLAWDBOT_CONTROL_UI_BASE_PATH__=""',
+      `window.__CLAWDBOT_CONTROL_UI_BASE_PATH__="${basePath}"`
+    );
+    
+    console.log('[HTTP] Injected base path:', basePath);
+    
+    return new Response(html, {
+      status: httpResponse.status,
+      headers: httpResponse.headers,
+    });
+  }
+  
+  return httpResponse;
 });
 
 // =============================================================================
