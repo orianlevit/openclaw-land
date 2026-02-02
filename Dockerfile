@@ -30,3 +30,6 @@ WORKDIR /root/clawd
 
 # Expose the gateway port
 EXPOSE 18789
+
+# Start the openclaw gateway
+CMD ["/usr/local/bin/start-openclaw.sh"]
