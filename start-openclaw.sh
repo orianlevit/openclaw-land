@@ -66,11 +66,8 @@ config.gateway.port = 18789;
 config.gateway.mode = 'local';
 config.gateway.trustedProxies = ['10.1.0.0'];
 
-// Set gateway token if provided
-if (process.env.OPENCLAW_GATEWAY_TOKEN) {
-  config.gateway.auth = config.gateway.auth || {};
-  config.gateway.auth.token = process.env.OPENCLAW_GATEWAY_TOKEN;
-}
+// Skip token auth for now - just use allowInsecureAuth
+// We can add token auth back later once WebSocket proxying is verified
 
 // Allow insecure auth for dev mode
 if (process.env.OPENCLAW_DEV_MODE === 'true') {
@@ -100,10 +97,7 @@ rm -f "$CONFIG_DIR/gateway.lock" 2>/dev/null || true
 BIND_MODE="lan"
 echo "Dev mode: ${OPENCLAW_DEV_MODE:-false}, Bind mode: $BIND_MODE"
 
-if [ -n "$OPENCLAW_GATEWAY_TOKEN" ]; then
-  echo "Starting gateway with token auth..."
-  exec clawdbot gateway --port 18789 --verbose --allow-unconfigured --bind "$BIND_MODE" --token "$OPENCLAW_GATEWAY_TOKEN"
-else
-  echo "Starting gateway with device pairing (no token)..."
-  exec clawdbot gateway --port 18789 --verbose --allow-unconfigured --bind "$BIND_MODE"
-fi
+# For now, run without token to simplify WebSocket connections
+# We can add token auth back later once WebSocket proxying is verified
+echo "Starting gateway without token (dev mode)..."
+exec clawdbot gateway --port 18789 --verbose --allow-unconfigured --bind "$BIND_MODE"
