@@ -173,11 +173,11 @@ app.get('/api/debug/container/:id', async (c) => {
   
   try {
     console.log('[Debug] Running exec command...');
-    // List processes and check gateway status
+    // List processes and check port
     const procs = await sandbox.listProcesses();
     console.log('[Debug] Processes:', JSON.stringify(procs));
     
-    const result = await sandbox.exec('ps aux && echo "---" && netstat -tlnp 2>/dev/null || ss -tlnp');
+    const result = await sandbox.exec('curl -v http://localhost:18789/ 2>&1 | head -30');
     console.log('[Debug] Exec result:', JSON.stringify(result));
     
     return c.json({
