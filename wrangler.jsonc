@@ -11,7 +11,7 @@
   // Static assets for UI
   "assets": {
     "directory": "./public",
-    "not_found_handling": "single-page-application",
+    "not_found_handling": "none",
     "html_handling": "auto-trailing-slash",
     "binding": "ASSETS",
     "run_worker_first": true
