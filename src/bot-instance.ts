@@ -7,11 +7,12 @@ import type { Env } from './types';
 export class BotInstance extends Container<Env> {
   defaultPort = 18789;
   sleepAfter = '10m';
-  enableInternet = true;
-  entrypoint = ['bash', '/usr/local/bin/start-openclaw.sh'];
   
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
+    
+    // Enable internet for the gateway
+    this.enableInternet = true;
     
     // Set environment variables
     this.envVars = {
