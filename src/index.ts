@@ -133,13 +133,14 @@ app.get('/bot/:id', async (c) => {
     return c.redirect('/');
   }
   
-  // Serve the chat HTML from assets
-  const url = new URL(c.req.url);
-  url.pathname = '/chat.html';
-  url.searchParams.set('botId', botId);
-  url.searchParams.set('botName', bot.name);
+  // Fetch the chat.html from assets
+  const assetUrl = new URL(c.req.url);
+  assetUrl.pathname = '/chat.html';
+  const assetResponse = await c.env.ASSETS.fetch(new Request(assetUrl.toString()));
   
-  return c.env.ASSETS.fetch(new Request(url.toString(), c.req.raw));
+  // Return the HTML content directly (don't redirect)
+  const html = await assetResponse.text();
+  return c.html(html);
 });
 
 /**
