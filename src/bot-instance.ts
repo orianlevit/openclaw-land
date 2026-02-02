@@ -88,12 +88,28 @@ export class BotInstance extends DurableObject<Env> {
     this.startingUp = true;
 
     try {
-      console.log('[BotInstance] Starting OpenClaw container...');
+      console.log('[BotInstance] Checking OpenClaw container...');
 
       // Get the container from state
       const container = this.getContainer();
       if (!container) {
         throw new Error('Container not available - ensure containers are configured in wrangler.jsonc');
+      }
+
+      // Check if container is already running by trying to connect
+      try {
+        const healthCheck = await container.fetch(
+          new Request(`http://localhost:${OPENCLAW_PORT}/api/health`),
+          OPENCLAW_PORT
+        );
+        if (healthCheck && healthCheck.ok) {
+          console.log('[BotInstance] Container already running');
+          this.gatewayReady = true;
+          return;
+        }
+      } catch (e) {
+        // Container not running, will start it
+        console.log('[BotInstance] Container not running, starting...');
       }
 
       // Start the gateway with environment variables
@@ -102,9 +118,19 @@ export class BotInstance extends DurableObject<Env> {
         .map(([k, v]) => `${k}=${v}`)
         .join(' ');
 
-      await container.start({
-        entrypoint: ['/bin/bash', '-c', `${envArgs} /usr/local/bin/start-openclaw.sh`],
-      });
+      try {
+        await container.start({
+          entrypoint: ['/bin/bash', '-c', `${envArgs} /usr/local/bin/start-openclaw.sh`],
+        });
+      } catch (startError: unknown) {
+        // If container is already running, that's fine
+        const errorMessage = startError instanceof Error ? startError.message : String(startError);
+        if (errorMessage.includes('already running')) {
+          console.log('[BotInstance] Container was already running');
+        } else {
+          throw startError;
+        }
+      }
 
       // Wait for gateway to be ready
       await this.waitForGateway();
