@@ -160,7 +160,7 @@ async function ensureOpenClawGateway(sandbox: Sandbox<Env>, env: Env, botId: str
 
 // Simple ping to verify Worker is running
 app.get('/api/ping', async (c) => {
-  return c.json({ pong: true, time: Date.now() });
+  return c.json({ pong: true, time: Date.now(), version: 'v2-basepath' });
 });
 
 app.get('/api/debug/container/:id', async (c) => {
@@ -427,9 +427,10 @@ app.all('/bot/:id/*', async (c) => {
   }
   
   // Handle HTTP requests
-  console.log('[HTTP] Proxying:', url.pathname + url.search);
+  console.log('[HTTP] Proxying v2:', url.pathname + url.search);
   
   try {
+    console.log('[HTTP] Calling containerFetch...');
     const httpResponse = await sandbox.containerFetch(proxyRequest, OPENCLAW_PORT);
     console.log('[HTTP] containerFetch completed, status:', httpResponse.status);
     
