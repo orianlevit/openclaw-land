@@ -378,4 +378,7 @@ app.get('*', async (c) => {
   return c.env.ASSETS.fetch(c.req.raw);
 });
 
-export default app;
+// Export Workers handler
+export default {
+  fetch: app.fetch,
+};
