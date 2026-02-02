@@ -20,6 +20,11 @@ const STARTUP_TIMEOUT_MS = 120_000; // 2 minutes for gateway startup
 
 const app = new Hono<AppEnv>();
 
+// TEST: Very first route to verify routing works
+app.get('/test-route', (c) => {
+  return c.text('TEST ROUTE WORKS!');
+});
+
 // Log all requests
 app.use('*', async (c, next) => {
   console.log('[Worker] Request:', c.req.method, c.req.url);
