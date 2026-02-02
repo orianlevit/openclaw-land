@@ -407,8 +407,17 @@ app.all('/bot/:id/*', async (c) => {
   
   // Handle WebSocket connections
   if (isWebSocketRequest) {
-    console.log('[WS] Proxying WebSocket connection');
-    return sandbox.wsConnect(proxyRequest, OPENCLAW_PORT);
+    console.log('[WS] Proxying WebSocket to:', url.pathname);
+    console.log('[WS] Original path:', c.req.url);
+    try {
+      const wsResponse = await sandbox.wsConnect(proxyRequest, OPENCLAW_PORT);
+      console.log('[WS] wsConnect response status:', wsResponse.status);
+      console.log('[WS] Has webSocket:', !!wsResponse.webSocket);
+      return wsResponse;
+    } catch (wsError) {
+      console.error('[WS] wsConnect failed:', wsError);
+      throw wsError;
+    }
   }
   
   // Handle HTTP requests
